@@ -101,7 +101,7 @@ class MutliHeadAttentionWrapper(nn.Module):
 
 # Using a wrapper makes the attention model work, but is not an effecient way to run it
 # The wrapper uses a for loop, therefore the attention is not calculated parallely across heads. 
-class MultiClassAttention(nn.Module):
+class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, context_lenght, dropout, num_heads, qkv_bias=False):
         super().__init__()
 
@@ -110,7 +110,7 @@ class MultiClassAttention(nn.Module):
 
         self.d_out= d_out
         self.num_heads= num_heads
-        self.head_dim == d_out // num_heads
+        self.head_dim = d_out // num_heads
 
         self.W_query= nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key= nn.Linear(d_in, d_out, bias=qkv_bias)
@@ -128,6 +128,44 @@ class MultiClassAttention(nn.Module):
         keys = self.W_key(x)
         queries = self.W_query(x)
         values = self.W_value(x)
+        # print(keys)
+        # print(keys.shape)
+
+        keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)
+        # print(keys)
+        # print(keys.shape)
+        # print("------------------")
+        queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
+        values = values.view(b, num_tokens, self.num_heads, self.head_dim)
+        
+        keys = keys.transpose(1,2)
+        queries =queries.transpose(1,2)
+        values = values.transpose(1,2)
+        # print(keys)
+        # print(keys.shape)
+        # print(values.shape)
+        # print(values.transpose(2,3).shape)
+        # print("------------------")
+
+        attn_scores = queries @ keys.transpose(2, 3) #F
+        print(attn_scores)
+        print(attn_scores.shape)
+        # print(self.mask)
+        # print(self.mask.shape)
+        mask_bool = self.mask.bool()[:num_tokens, :num_tokens] #G
+        attn_scores.masked_fill_(mask_bool, -torch.inf) #H
+        # print(mask_bool)
+        #Dealing with tensor shapes
+
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        print(attn_weights)
+        print(attn_weights.shape)
+        context_vec = (attn_weights @ values).transpose(1, 2) 
+        context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
+        print(context_vec)
+
+        return context_vec
+
 
         
 
