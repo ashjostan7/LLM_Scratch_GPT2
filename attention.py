@@ -102,7 +102,7 @@ class MutliHeadAttentionWrapper(nn.Module):
 # Using a wrapper makes the attention model work, but is not an effecient way to run it
 # The wrapper uses a for loop, therefore the attention is not calculated parallely across heads. 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_in, d_out, context_lenght, dropout, num_heads, qkv_bias=False):
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
         super().__init__()
 
         # d_out must be divisible by num_heads
@@ -115,10 +115,11 @@ class MultiHeadAttention(nn.Module):
         self.W_query= nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key= nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value= nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.out_proj = nn.Linear(d_out, d_out)
         self.dropout= nn.Dropout(dropout)
         self.register_buffer(
             "mask",
-            torch.triu(torch.ones(context_lenght, context_lenght), diagonal =1)
+            torch.triu(torch.ones(context_length, context_length), diagonal =1)
         )
 
     def forward(self,x):
@@ -148,8 +149,8 @@ class MultiHeadAttention(nn.Module):
         # print("------------------")
 
         attn_scores = queries @ keys.transpose(2, 3) #F
-        print(attn_scores)
-        print(attn_scores.shape)
+        #print(attn_scores)
+        #print(attn_scores.shape)
         # print(self.mask)
         # print(self.mask.shape)
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens] #G
@@ -158,11 +159,12 @@ class MultiHeadAttention(nn.Module):
         #Dealing with tensor shapes
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
-        print(attn_weights)
-        print(attn_weights.shape)
+        #print(attn_weights)
+        #print(attn_weights.shape)
         context_vec = (attn_weights @ values).transpose(1, 2) 
         context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
-        print(context_vec)
+        context_vec = self.out_proj(context_vec)
+        #print(context_vec)
 
         return context_vec
 
